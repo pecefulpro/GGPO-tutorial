@@ -267,14 +267,14 @@ bool Callbacks::save_game_state(unsigned char **buffer, int *len, int *checksum,
 	}
 
 	*len = sizeof(gs);
-    *buffer = (unsigned char*)malloc(*len);
-    if(!*buffer)
-        return false;
+    	*buffer = (unsigned char*)malloc(*len);
+    	if(!*buffer)
+        	return false;
     
-    GGPO::get_singleton()->emit_signal("save_game_state");
+    	GGPO::get_singleton()->emit_signal("save_game_state");
 
 	memcpy(*buffer, &gs, *len);
-    *checksum = fletcher32_checksum((short*)*buffer, *len / 2);
+    	*checksum = fletcher32_checksum((short*)*buffer, *len / 2);
 
     return true;
 }
@@ -349,7 +349,7 @@ void GGPO::_bind_methods() {
     ClassDB::bind_method(D_METHOD("advanceFrame"), &GGPO::advanceFrame);
     ClassDB::bind_method(D_METHOD("log", "text"), &GGPO::log);
     ClassDB::bind_method(D_METHOD("getNetworkStats", "playerHandle"), &GGPO::getNetworkStats);
-	ClassDB::bind_method(D_METHOD("ProcessRef", "Instance"), &GGPO::ProcessRef);
+    ClassDB::bind_method(D_METHOD("ProcessRef", "Instance"), &GGPO::ProcessRef);
 
     ADD_SIGNAL(MethodInfo("advance_frame", PropertyInfo(Variant::POOL_BYTE_ARRAY, "buffer")));
     ADD_SIGNAL(MethodInfo("load_game_state", PropertyInfo(Variant::POOL_BYTE_ARRAY, "buffer")));
