@@ -8,6 +8,7 @@
 #include "ggponet.h"
 #include <scene\main\node.h>
 #include <core\engine.h>
+#include <list> 
 
 
 #define MAX_PLAYERS 4
@@ -17,14 +18,15 @@
 #define INVALID_HANDLE (-1)
 
 
-// delete later
 GGPOSession* GGPOPtr;
 Object *GameStateRef;
-
-//--------------
-
 GGPO* GGPO::singleton = NULL;
-int gs[10] = { 0 };
+String SaveStateName;
+int NubmerPlayers = 0;
+Variant gs;
+
+// Holds the Variant object so it's not lost when it goes out of scope 
+std::list<Variant> tempbuffer;
 
 GGPO::GGPO() {
 	singleton = this;
@@ -37,9 +39,7 @@ GGPO::~GGPO() {
 GGPO *GGPO::get_singleton() {
 	return GGPO::singleton;
 }
-
-
-void addinputs(int inputs[], Array a);
+void addInputs(int inputs[], Array a);
 
 // Used to begin a new GGPO.net session. The ggpo object returned by ggpo_start_session uniquely identifies the state for this session and should be passed to all other functions.
 int GGPO::startSession(const String& game, int numPlayers, int localPort) {
@@ -52,7 +52,8 @@ int GGPO::startSession(const String& game, int numPlayers, int localPort) {
     cb.save_game_state = &Callbacks::save_game_state;
     cb.free_buffer = &Callbacks::free_buffer;
     cb.on_event = &Callbacks::on_event;
-	
+
+	NubmerPlayers = numPlayers;
     auto result = ggpo_start_session(&GGPOPtr, &cb, game.utf8().get_data(), numPlayers, sizeof(int), localPort);
     return result;
 }
@@ -68,6 +69,7 @@ int GGPO::startSynctest(const String& game, int numPlayers, int frames) {
     cb.free_buffer = &Callbacks::free_buffer;
     cb.on_event = &Callbacks::on_event;
 
+	NubmerPlayers = numPlayers;
     char gameTab[128];
     strcpy(gameTab, game.utf8().get_data());
 	auto result = ggpo_start_synctest(&GGPOPtr, &cb, gameTab, numPlayers, sizeof(uint64_t), frames);
@@ -87,6 +89,7 @@ int GGPO::startSpectating(const String& game, int numPlayers, int localPort, con
     cb.free_buffer = &Callbacks::free_buffer;
     cb.on_event = &Callbacks::on_event;
 
+	NubmerPlayers = numPlayers;
     char hostIpTab[16];
     strcpy(hostIpTab, hostIp.utf8().get_data());
 	auto result = ggpo_start_spectating(&GGPOPtr, &cb, game.utf8().get_data(), numPlayers, sizeof(uint64_t), localPort, hostIpTab, hostPort);
@@ -108,7 +111,7 @@ Dictionary GGPO::synchronizeInput(int length) {
 	Array a;
 	auto result = ggpo_synchronize_input(GGPOPtr, (void *)inputs, sizeof(int) * MAX_PLAYERS, &disconnectFlags);
 
-	addinputs(inputs,a);
+	addInputs(inputs,a);
 
 	d["result"] = result;
 	if (result == ERRORCODE_SUCCESS) {
@@ -172,14 +175,16 @@ void GGPO::log(const String& text) {
 	ggpo_log(GGPOPtr, text.utf8().get_data());
 }
 
-
-void GGPO::ProcessRef(Object *customScriptInstance) {
+//Creates a Reference to the GameState Object.
+void GGPO::createInstance(Object *customScriptInstance, String text) {
 
 	GameStateRef = customScriptInstance;
-}	
+	SaveStateName = text;
+}
 
-void addinputs(int inputs[], Array a) {
-	for (int i = 0; i < 2; i++) {
+//Converts the input Array to a godot Array Type 
+void addInputs(int inputs[], Array a) {
+	for (int i = 0; i < NubmerPlayers; i++) {
 		a.append(inputs[i]);
 	}
 }
@@ -188,7 +193,7 @@ void addinputs(int inputs[], Array a) {
 Dictionary GGPO::getNetworkStats(int playerHandle) {
     GGPONetworkStats stats;
     Dictionary d;
-
+	
     auto result = ggpo_get_network_stats(GGPOPtr, playerHandle, &stats);
     d["result"] = result;
     if(result == ERRORCODE_SUCCESS) {
@@ -235,7 +240,7 @@ bool Callbacks::advance_frame(int flags) {
 	Array a;
 
 	ggpo_synchronize_input(GGPOPtr, (void *)inputs, sizeof(int) * MAX_PLAYERS, &disconnectFlags);
-	addinputs(inputs,a);
+	addInputs(inputs,a);
 
 	GGPO::get_singleton()->emit_signal("advance_frame", a);
 
@@ -243,14 +248,12 @@ bool Callbacks::advance_frame(int flags) {
 }
 
 bool Callbacks::load_game_state(unsigned char* buffer, int len) {
-	memcpy(&gs, buffer, len);
-	Array a;
-	for (int i : gs) {
-		a.append(i);
-	}
 
-	GGPO::get_singleton()->emit_signal("load_game_state", a);
 	
+	memcpy(&gs, buffer, len);
+	GGPO::get_singleton()->emit_signal("load_game_state", gs);
+	tempbuffer.clear();
+		
     return true;
 }
 
@@ -259,23 +262,33 @@ bool Callbacks::log_game_state(char* filename, unsigned char* buffer, int len) {
     return true;
 }
 
-bool Callbacks::save_game_state(unsigned char **buffer, int *len, int *checksum, int frame) {
-	Array bytearray = GameStateRef->call("Save_GameState");
 
-	for (int i = 0; i < bytearray.size(); i++) {
-		gs[i] = bytearray[i];
+
+bool Callbacks::save_game_state(unsigned char **buffer, int *len, int *checksum, int frame) {
+
+	
+	Variant gs = GameStateRef->call(SaveStateName);
+	StreamPeerBuffer *button = Object::cast_to<StreamPeerBuffer>(gs);
+	button->seek(0);
+	int check = button->get_32();
+
+	tempbuffer.push_front(gs);
+
+	if (tempbuffer.size() > MAX_PREDICTION_FRAMES) {
+		//Removes unnecessary  save states from the temp buffer 
+		tempbuffer.pop_back();
 	}
 
 	*len = sizeof(gs);
-    	*buffer = (unsigned char*)malloc(*len);
-    	if(!*buffer)
-        	return false;
+    *buffer = (unsigned char*)malloc(*len);
+
+    if(!*buffer)
+        return false;
     
-    	GGPO::get_singleton()->emit_signal("save_game_state");
-
+    GGPO::get_singleton()->emit_signal("save_game_state");
 	memcpy(*buffer, &gs, *len);
-    	*checksum = fletcher32_checksum((short*)*buffer, *len / 2);
-
+    //*checksum = fletcher32_checksum((short*)*buffer, *len / 2);
+	*checksum = check;
     return true;
 }
 
@@ -349,10 +362,10 @@ void GGPO::_bind_methods() {
     ClassDB::bind_method(D_METHOD("advanceFrame"), &GGPO::advanceFrame);
     ClassDB::bind_method(D_METHOD("log", "text"), &GGPO::log);
     ClassDB::bind_method(D_METHOD("getNetworkStats", "playerHandle"), &GGPO::getNetworkStats);
-    ClassDB::bind_method(D_METHOD("ProcessRef", "Instance"), &GGPO::ProcessRef);
+	ClassDB::bind_method(D_METHOD("createInstance", "object", "name"), &GGPO::createInstance);
 
     ADD_SIGNAL(MethodInfo("advance_frame", PropertyInfo(Variant::POOL_BYTE_ARRAY, "buffer")));
-    ADD_SIGNAL(MethodInfo("load_game_state", PropertyInfo(Variant::POOL_BYTE_ARRAY, "buffer")));
+	ADD_SIGNAL(MethodInfo("load_game_state", PropertyInfo(Variant::OBJECT, "buffer", PROPERTY_HINT_PROPERTY_OF_BASE_TYPE, "PoolByteArray")));
     ADD_SIGNAL(MethodInfo("log_game_state", PropertyInfo(Variant::STRING, "filename"), PropertyInfo(Variant::POOL_BYTE_ARRAY, "buffer")));
     ADD_SIGNAL(MethodInfo("save_game_state"));
     ADD_SIGNAL(MethodInfo("event_connected_to_peer", PropertyInfo(Variant::INT, "player")));
