@@ -1,6 +1,6 @@
 # GGPO-tutorial-
 
-A repo desinged to help people understand the basic implimtation of GGPO in the godot engine 
+A repo desinged to help people understand the basic implementation of GGPO in the godot engine 
 
 ## To use
 1) Go download the [godot module](https://github.com/FlutterTal/godot_ggpo) and follow the instructions to build.
