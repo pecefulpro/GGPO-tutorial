@@ -16,27 +16,57 @@ func Update(inputs):
 	var i = 0
 	for p in players:
 		p.MovePlayer(inputs[i])
+		
+#		Examples:
+#		p.PlayerAttack()
+#       p.PlayerHurt() 
+#       p.MoveAI()
+
 		i += 1
 
 func Save_GameState():
-	var GameStateArry = []
-	for i in players:
-		GameStateArry.append(round(i.velocity.x))
-		GameStateArry.append(round(i.velocity.y))
-		GameStateArry.append(round(i.position.x))
-		GameStateArry.append(round(i.position.y))
-	#print(str(GameStateArry) + "save")
-	return GameStateArry
+    var stream = StreamPeerBuffer.new()
+    for i in players:
+        stream.clear()
+		
+#		put_8 range = -128 to 127
+#		put_16 range = −32,768 to 32,767 
+#		put_32 range = -2147483648 to 2147483647
+#		put_64 range = −(2^63) to 2^63 − 1	
+		
+        stream.put_32(0) # Reserves space for the checksum 
+        stream.put_8(round(i.velocity.x)) # 4
+        stream.put_8(round(i.velocity.y)) # 5
+        stream.put_16(round(i.position.x)) # 331
+        stream.put_16(round(i.position.y)) # 91
+        stream.put_string("test") 
+	
+	
+    var check = CalcFletcher32(stream)
+    stream.seek(0)
+    stream.put_32(check)
+    
+    return stream
 
 func Load_GameState(buffer):
-	#print(str(buffer) + " loaded gamestate")
 	
-	#TODO: Making loading clearner 
-	var i = 0
-	for p in players:
-		p.velocity.x = buffer[0 + i]
-		p.velocity.y = buffer[1 + i]
-		p.position.x = buffer[2 + i]
-		p.position.y = buffer[3 + i]
-		i += 4
+	
+    buffer.seek(0) # Sets the position indicator for the StreamPeerBuffer to 0.
+    buffer.get_32() # Removes the checksum 
+    for p in players:
+        p.velocity.x = buffer.get_8() # 4
+        p.velocity.y = buffer.get_8() # 5
+        p.position.x = buffer.get_16() # 331
+        p.position.y = buffer.get_16() # 91
+        p.set_id_name(buffer.get_string()) # "test"
 
+
+func CalcFletcher32(data):
+    var sum1 = 0
+    var sum2 = 0
+    var index = data.get_data_array()
+    for i in range(index.size()):
+        sum1 = (sum1 + index[i]) % 0xffff
+        sum2 = (sum2 + sum1) % 0xffff
+    
+    return (int(sum2 << 16) | sum1)

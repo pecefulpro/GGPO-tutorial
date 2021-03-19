@@ -6,9 +6,6 @@
 [node name="Node2D" type="KinematicBody2D"]
 position = Vector2( 331, 91 )
 script = ExtResource( 2 )
-__meta__ = {
-"_edit_group_": true
-}
 
 [node name="Sprite" type="Sprite" parent="."]
 texture = ExtResource( 1 )
@@ -16,11 +13,11 @@ __meta__ = {
 "_edit_group_": true
 }
 
-[node name="Label" type="Label" parent="."]
-margin_left = -16.0362
-margin_top = -55.6812
-margin_right = 23.9638
-margin_bottom = -41.6812
+[node name="Label1" type="Label" parent="."]
+margin_left = -6.71753
+margin_top = -57.2757
+margin_right = 33.2825
+margin_bottom = -43.2757
 __meta__ = {
 "_edit_use_anchors_": false
 }
