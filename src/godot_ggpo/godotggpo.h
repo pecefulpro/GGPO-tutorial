@@ -49,7 +49,7 @@ public:
     int setFrameDelay(int playerHandle, int frameDelay);
     int advanceFrame();
     void log(const String& text);
-	void createInstance(Object *customScriptInstance, String text);
+    void createInstance(Object *customScriptInstance, String text);
     Dictionary getNetworkStats(int playerHandle);
 
 
