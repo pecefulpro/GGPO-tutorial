@@ -13,7 +13,7 @@ const OTHER_HANDEL = 2
 const MAX_PLAYERS = 2 
 const IP_ADDRESS = "127.0.0.1"
 const PLAYER_NUMBERS = 2
-const SYNC_TEST = true
+const SYNC_TEST = false
 
 var localPlayerHandle
 var result
@@ -22,7 +22,7 @@ var gs
 
 func _ready():
 	if SYNC_TEST:
-		result = GGPO.startSynctest("Test", PLAYER_NUMBERS, 1)
+		result = GGPO.startSynctest("Test", PLAYER_NUMBERS, 7)
 	else:
 		result = GGPO.startSession("ark", PLAYER_NUMBERS , LOCAL)
 		
@@ -31,7 +31,7 @@ func _ready():
 	var localHandle = GGPO.addPlayer(GGPO.PLAYERTYPE_LOCAL, PLAYER_HANDEL, IP_ADDRESS,LOCAL)
 	localPlayerHandle = localHandle["playerHandle"]
 	GGPO.setFrameDelay(localPlayerHandle, 2)
-	GGPO.addPlayer(GGPO.PLAYERTYPE_REMOTE, OTHER_HANDEL, IP_ADDRESS,PLAYER_PORT)
+	#GGPO.addPlayer(GGPO.PLAYERTYPE_REMOTE, PLAYER_HANDEL, IP_ADDRESS,PLAYER_PORT)
 	GGPO.createInstance(gs, "Save_GameState")
 	GGPO.addPlayer(GGPO.PLAYERTYPE_REMOTE, OTHER_HANDEL, IP_ADDRESS,PLAYER_PORT)
 	registrar_player(localPlayerHandle)
@@ -39,13 +39,15 @@ func _ready():
 	
 func _physics_process(delta):
 	GGPO_idle()
+	print(GGPO.getNetworkStats(2))
 	var input = read_input()
-	var result = GGPO.ERRORCODE_SUCCESS
+	var result
 	if localPlayerHandle != GGPO.INVALID_HANDLE:
 		result = GGPO.addLocalInput(localPlayerHandle,input)
 	if result == GGPO.ERRORCODE_SUCCESS:
 		result = GGPO.synchronizeInput(MAX_PLAYERS)
 		if result["result"] == GGPO.ERRORCODE_SUCCESS:
+			print(result["inputs"])
 			Advanced_Frame(result["inputs"])
 			
 	
@@ -94,6 +96,7 @@ func registrar_player(handel):
 	gs.players.append(player_instance)
 
 func GGPO_idle():
+	# milliseconds you're allowing GGPO to spend.
 	# Not necessary to do
 	var start = 0
 	var next = 0
@@ -111,6 +114,7 @@ func _onEventConnectedToPeer(handel):
 	registrar_player(handel)
 
 func _onAdvanceFrame(inputs):
+	print("Advanced Frame Call back with inputs - \"" + str(inputs)  + "\"")
 	gs.Update(inputs)
 	#print("On Event onAdvanceFrame")
 	GGPO.advanceFrame()
