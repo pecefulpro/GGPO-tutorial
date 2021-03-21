@@ -6,3 +6,6 @@ A repo desinged to help people understand the basic implementation of GGPO in th
 1) Go download the [godot module](https://github.com/FlutterTal/godot_ggpo) and follow the instructions to build.
 2) Download this repo and replace `godotggpo.cpp` and `godotggpo.h` and rebuild.
 3) Open the Project in Godot. 
+
+Video Tutorial - https://youtu.be/nG8uyxEyUzk
+
